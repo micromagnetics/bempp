@@ -57,6 +57,15 @@ class Space(object):
         """
         return self._impl.get_global_dofs(element._impl, dof_weights)
 
+    def shapeset(self, element):
+        """Return the Shapeset associated with a given element."""
+
+        from bempp.api.space.shapeset import Shapeset
+        return Shapeset(
+                self._impl.shapeset(element._impl))
+
+
+
     def evaluate_local_basis(self, element, local_coordinates,
                              local_coefficients):
         """Evaluate a local basis on a given element."""
@@ -112,8 +121,15 @@ class Space(object):
         """
         return self._impl.global_dof_normals
 
+def _evaluate_local_surface_gradient(space, element, local_coordinates, local_coefficients):
+    """Evaluate the local surface gradient on a given element."""
+    from bempp.core.space.space import evaluate_local_surface_gradient_ext
+    return evaluate_local_surface_gradient_ext(space._impl, element._impl, 
+                                           local_coordinates,
+                                           local_coefficients)
 
-def function_space(grid, kind, order, domains=None, closed=True):
+def function_space(grid, kind, order, domains=None, closed=True, strictly_on_segment=False,
+        reference_point_on_segment=True, element_on_segment=False):
     """ Return a space defined over a given grid.
 
     Parameters
@@ -143,11 +159,33 @@ def function_space(grid, kind, order, domains=None, closed=True):
         Specifies whether the space is defined on a closed
         or open subspace.
 
+    strictly_on_segment: bool
+        Specifies whether local basis functions are truncated to
+        the domains specified (True) or if they are allowed to extend
+        past the domains (False). Default is False. This argument is
+        only used for scalar continuous spaces.
+    
+    reference_point_on_segment: bool
+        If true only include a dof if its reference point (i.e. the 
+        dof position) is part of the segment. This argument is only
+        used for discontinuous spaces (default is True).
+
+    element_on_segment: bool
+        If true restrict the dofs to those whose support element
+        is part of the segment (default is False).
+
+
+
+
     Notes
     -----
     The most frequent used types are the space of piecewise constant
     functions (kind="DP", order=0) and the space of continuous,
     piecewise linear functions (kind="P", order=1).
+
+    Either one of `reference_point_on_segment` or `element_on_segment`
+    must be true for discontinuous spaces. For piecewise constant spaces
+    neither of these two options has any effect.
 
     This is a factory function that initializes a space object. To 
     see a detailed help for space objects see the documentation
@@ -164,7 +202,14 @@ def function_space(grid, kind, order, domains=None, closed=True):
     >>> space = function_space(grid,"P",1)
 
     """
+    from types import MethodType
     from bempp.core.space.space import function_space as _function_space
-    return Space(_function_space(grid._impl, kind, order, domains, closed))
+    space = Space(_function_space(grid._impl, kind, order, domains, closed, strictly_on_segment,
+        reference_point_on_segment, element_on_segment))
 
+    # Add a surface gradient function for spaces that support it
+    if kind == "P" or kind == "DP":
+        space.evaluate_surface_gradient = MethodType(_evaluate_local_surface_gradient, space)
+
+    return space
 

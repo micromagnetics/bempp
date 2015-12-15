@@ -1,14 +1,11 @@
 """ Boundary Element Method package BEM++ """
 from __future__ import print_function
 
-# Check if at least Scipy 0.16.0 is installed. BEM++ fails otherwise.
-import scipy
-if scipy.version.version < '0.16.0':
-    raise Exception("At leat SciPy version 0.16.0 required to run BEM++. Found version {0}".format(scipy.version.version))
     
+# import the version string
+from bempp import config as _config
+__version__ = _config.version
 
-# This imports dolfin at the same time as bempp if available to avoid delays
-# at later imports of dolfin
 
 # Initialize logger
 
@@ -43,6 +40,7 @@ def _check_create_init_dir():
     """Create the temporary dir if necessary."""
     from os.path import expanduser, join, isdir
     from os import mkdir
+    import tempfile
 
     home = expanduser("~")
     config_path = join(home,".bempp")
@@ -51,22 +49,18 @@ def _check_create_init_dir():
         if not isdir(config_path):
             mkdir(config_path)
     except OSError: # Read only file system try a tmp dir
-        import tempfile
         import warnings
         warnings.warn("Could not create BEM++ config dir."
             "Falling back to a temorary dir."
             "Your config will not be stored")
         config_path = tempfile.mkdtemp()
 
-    tmp_path = join(config_path,"tmp")
-    if not isdir(tmp_path):
-        mkdir(tmp_path)
+    tmp_path = tempfile.mkdtemp()
 
     return config_path, tmp_path
 
 
 CONFIG_PATH, TMP_PATH = _check_create_init_dir()
-
 
 # Get the path to Gmsh
 
@@ -125,4 +119,6 @@ def test():
     loader = unittest.TestLoader()
     suite = loader.discover(dirname(__file__))
     test_runner = unittest.TextTestRunner(verbosity=2)
-    test_runner.run(suite)
+    result = test_runner.run(suite)
+    return result.wasSuccessful()
+

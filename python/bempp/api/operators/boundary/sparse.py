@@ -42,15 +42,19 @@ def identity(domain, range_, dual_to_range,
                          dual_to_range._impl, "", symmetry)),
             parameters=parameters, label=label)
 
-def maxwell_identity(space,
+def maxwell_identity(domain, range_, dual_to_range,
                      label="MAXWELL_IDENTITY", symmetry='no_symmetry',
                      parameters=None):
     """Return the Maxwell identity operator.
 
     Parameters
     ----------
-    space : bempp.api.space.Space
-        Space on which the operator is defined.
+    domain : bempp.api.space.Space
+        Domain space.
+    range_ : bempp.api.space.Space
+        Range space.
+    dual_to_range : bempp.api.space.Space
+        Dual space to the range space.
     label : string
         Label for the operator.
     symmetry : string
@@ -73,8 +77,8 @@ def maxwell_identity(space,
 
     return LocalBoundaryOperator(\
             ElementaryAbstractLocalOperator(
-            maxwell_identity_ext(parameters, space._impl, space._impl,
-                                 space._impl, "", symmetry)),
+            maxwell_identity_ext(parameters, domain._impl, range_._impl,
+                                 dual_to_range._impl, "", symmetry)),
             parameters=parameters, label=label)
 
 def laplace_beltrami(domain, range_, dual_to_range,
@@ -120,7 +124,7 @@ def laplace_beltrami(domain, range_, dual_to_range,
                                  dual_to_range._impl, "", symmetry)),
             parameters=parameters, label=label)
 
-def multitrace_identity(grid, parameters=None):
+def multitrace_identity(grid, parameters=None, spaces='linear'):
     """Return the multitrace identity operator.
 
     Parameters
@@ -131,18 +135,29 @@ def multitrace_identity(grid, parameters=None):
         Parameters for the operator. If none given
         the default global parameter object
         `bempp.api.global_parameters` is used.
+    spaces: string
+        Choose 'linear' to assemble the operator
+        with continuous linear function spaces for the
+        Dirichlet and Neumann component (default). For
+        a dual pairing of a linear space for the Dirichlet
+        data and piecewise constant space for the Neumann
+        data choose 'dual'.
 
     """
 
     from bempp.api.assembly import BlockedOperator
     import bempp.api
 
-    const_space = bempp.api.function_space(grid, "DUAL", 0)
-    lin_space = bempp.api.function_space(grid, "B-P", 1)
-
     blocked_operator = BlockedOperator(2,2)
 
-    blocked_operator[0, 0] = identity(lin_space, lin_space, const_space, parameters=parameters)
-    blocked_operator[1, 1] = identity(const_space, const_space, lin_space, parameters=parameters)
+    if spaces=='linear':
+        const_space = bempp.api.function_space(grid, "DUAL", 0)
+        lin_space = bempp.api.function_space(grid, "B-P", 1)
+        blocked_operator[0, 0] = identity(lin_space, lin_space, const_space, parameters=parameters)
+        blocked_operator[1, 1] = identity(const_space, const_space, lin_space, parameters=parameters)
+    elif spaces=='dual':
+        space = bempp.api.function_space(grid, "P", 1)
+        blocked_operator[0, 0] = identity(space, space, space, parameters=parameters)
+        blocked_operator[1, 1] = blocked_operator[0, 0]
 
     return blocked_operator

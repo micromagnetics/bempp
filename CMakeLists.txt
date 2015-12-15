@@ -1,10 +1,9 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 2.8.11)
 project(Bempp CXX)
 
 # Get version string
-string(TIMESTAMP date_string %y-%m-%d)
-
-set(Bempp_VERSION 2.9.1-nightly-${date_string})
+file(STRINGS "VERSION" Bempp_VERSION LIMIT_COUNT 1)
+message("BEM++ Version ${Bempp_VERSION}")
 
 # Set a default build type if none was specified
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -116,9 +115,16 @@ file(WRITE ${PROJECT_BINARY_DIR}/bin/ibempp "${PROJECT_BINARY_DIR}/localpython.s
 execute_process(COMMAND chmod +x ${PROJECT_BINARY_DIR}/bin/bempp)
 execute_process(COMMAND chmod +x ${PROJECT_BINARY_DIR}/bin/ibempp)
 
+add_custom_target(bempp DEPENDS libbempp cython-headers cython)
+
 # Prepare the debian build script
 configure_file(${PROJECT_SOURCE_DIR}/create_debian_package.sh.in ${PROJECT_BINARY_DIR}/create_debian_package.sh)
 
 add_custom_target(debian sh ${PROJECT_BINARY_DIR}/create_debian_package.sh DEPENDS bempp)
+
+# Prepare the tarball build script
+configure_file(${PROJECT_SOURCE_DIR}/create_tar.sh.in ${PROJECT_BINARY_DIR}/create_tar.sh)
+
+add_custom_target(tar sh ${PROJECT_BINARY_DIR}/create_tar.sh DEPENDS bempp)
 
 
