@@ -69,7 +69,7 @@ def fenics_to_bempp_trace_data(fenics_space):
 
     if family=="Lagrange":
         if degree==1:
-            import p1_coupling
+            from . import p1_coupling
             return p1_coupling.p1_trace(fenics_space)
         else:
             return generic_pn_trace(fenics_space)
