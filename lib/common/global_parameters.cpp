@@ -51,11 +51,12 @@ ParameterList GlobalParameters::parameterList() {
 
   // Use polynomial interpolation instead of exponentials to assemble
   // Helmholtz or Maxwell type kernels.
-  parameters.put("options.assembly.enableInterpolationForOscillatoryKernels", true);
+  parameters.put("options.assembly.enableInterpolationForOscillatoryKernels",
+                 true);
 
   // Number of interpolation points per wavelength for oscillatory kernels.
-  parameters.put("options.assembly.interpolationPointsPerWavelength", static_cast<int>(5000));
-   
+  parameters.put("options.assembly.interpolationPointsPerWavelength",
+                 static_cast<int>(5000));
 
   // Order for singular double integrals.
   parameters.put("options.quadrature.doubleSingular", static_cast<int>(6));
@@ -94,7 +95,7 @@ ParameterList GlobalParameters::parameterList() {
   parameters.put("options.hmat.minBlockSize", static_cast<int>(20));
 
   // Specifies the maximum size of an admissible block
-  parameters.put("options.hmat.maxBlockSize", static_cast<int>(2048));
+  parameters.put("options.hmat.maxBlockSize", static_cast<int>(1000000));
 
   // Specifies the block separation parameter eta.
   parameters.put("options.hmat.eta", static_cast<double>(1.2));
@@ -112,7 +113,7 @@ ParameterList GlobalParameters::parameterList() {
   parameters.put("options.hmat.compressionAlgorithm", std::string("aca"));
 
   // Enable coarsening
-  parameters.put("options.hmat.coarsening", true);
+  parameters.put("options.hmat.coarsening", false);
 
   // Accuracy for coarsening
   // 0: Use same as options.hmat.eps

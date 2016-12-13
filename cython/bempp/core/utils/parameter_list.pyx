@@ -13,6 +13,26 @@ def _convert_to_bytes(s):
         raise ValueError('String type expected.')
     return res
 
+cdef class _VerbosityParameterList:
+
+    def __cinit__(self):
+        pass
+    
+    def __init__(self):
+        pass
+
+
+
+    property extended_verbosity:
+
+        def __get__(self):
+
+            return self._extended_verbosity
+
+        def __set__(self, cbool value):
+
+            self._extended_verbosity = value
+
 cdef class _AssemblyParameterList:
 
     def __cinit__(self, ParameterList base):
@@ -64,7 +84,7 @@ cdef class _AssemblyParameterList:
 
             cdef char* s = b"options.assembly.enableSingularIntegralCaching"           
             deref(self.impl_).put_bool(s,value)
-    
+
     property enable_interpolation_for_oscillatory_kernels:
 
         def __get__(self):
@@ -303,6 +323,7 @@ cdef class ParameterList:
         self._assembly = _AssemblyParameterList(self)
         self._quadrature = _QuadratureParameterList(self)
         self._hmat = _HMatParameterList(self)
+        self._verbosity = _VerbosityParameterList()
         (<_AssemblyParameterList>self._assembly).impl_ = self.impl_
         (<_QuadratureParameterList>self._quadrature).impl_ = self.impl_
         (<_NearField>self.quadrature.near).impl_ = self.impl_
@@ -331,13 +352,8 @@ cdef class ParameterList:
         def __get__(self):
             return self._hmat
 
+    property verbosity:
 
-
-
-
-        
-
-        
-
-
+        def __get__(self):
+            return self._verbosity
 

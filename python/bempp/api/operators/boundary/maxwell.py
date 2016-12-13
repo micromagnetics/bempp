@@ -2,11 +2,45 @@
 
 """Definition of the Maxwell boundary operators."""
 
+def _electric_field_impl(domain, range_, dual_to_range, wave_number,
+        label, symmetry, parameters, assemble_only_singular_part):
+    """ Return the actual electric field operator. """
+
+    from bempp.core.operators.boundary.maxwell import electric_field_ext
+    from bempp.api.assembly import ElementaryBoundaryOperator
+    from bempp.api.assembly.abstract_boundary_operator import ElementaryAbstractIntegralOperator
+
+    return ElementaryBoundaryOperator(
+        ElementaryAbstractIntegralOperator(
+            electric_field_ext(parameters, domain._impl, range_._impl,
+                             dual_to_range._impl, 
+                             wave_number, "", symmetry),
+            domain, range_, dual_to_range),
+        parameters=parameters, label=label,
+        assemble_only_singular_part=assemble_only_singular_part)
+    
+def _magnetic_field_impl(domain, range_, dual_to_range, wave_number,
+        label, symmetry, parameters, assemble_only_singular_part):
+    """ Return the actual magnetic field operator. """
+
+    from bempp.core.operators.boundary.maxwell import magnetic_field_ext
+    from bempp.api.assembly import ElementaryBoundaryOperator
+    from bempp.api.assembly.abstract_boundary_operator import ElementaryAbstractIntegralOperator
+
+    return ElementaryBoundaryOperator(
+        ElementaryAbstractIntegralOperator(
+            magnetic_field_ext(parameters, domain._impl, range_._impl,
+                             dual_to_range._impl, 
+                             wave_number, "", symmetry),
+            domain, range_, dual_to_range),
+        parameters=parameters, label=label,
+        assemble_only_singular_part=assemble_only_singular_part)
 
 def electric_field(domain, range_, dual_to_range,
                    wave_number,
                    label="EFIE", symmetry='no_symmetry',
-                   parameters=None, use_slp=False):
+                   parameters=None, use_projection_spaces=True,
+                   assemble_only_singular_part=False):
     """Return the Maxwell electric field boundary operator.
 
     Parameters
@@ -28,87 +62,77 @@ def electric_field(domain, range_, dual_to_range,
         Parameters for the operator. If none given the
         default global parameter object `bempp.api.global_parameters`
         is used.
-    use_slp : True/False or boundary operator object
-        The electric field operator can be represented as a sparse transformation
-        of a Helmholtz single-layer operator. If `use_slp=True` this representation is used.
-        It is currently only implemented for the case that the domain, range and dual_to_range
-        space are identical. Therefore, the range_ and dual_to_range parameters are ignored.
-        If `use_slp=op` for a single-layer boundary operator assembled on a
-        suitable space this operator is used to assemble the hypersingular operator.
-        Note that if `use_slp=op` is used no checks are performed if the slp operator
-        is correctly defined for representing the hypersingular operator. Hence,
-        if no care is taken this option can lead to a wrong operator. Also,
-        `use_slp=True` or `use_slp=op` is only valid if the `domain` and `dual_to_range`
-        spaces are identical.
-
-
+    use_projection_spaces : bool
+        Represent operator by projection from higher dimensional space
+        if available. This parameter can speed up fast assembly routines,
+        such as H-Matrices or FMM (default true).
+    assemble_only_singular_part : bool
+        When assembled the operator will only contain components for adjacent or 
+        overlapping test and trial functions (default false).
     """
 
-    import bempp
-    from bempp.core.operators.boundary.maxwell import electric_field_ext
-    from bempp.api.assembly import ElementaryBoundaryOperator
-    from bempp.api.assembly.boundary_operator import BoundaryOperator
-    from bempp.api.assembly import LocalBoundaryOperator
-    from bempp.api.assembly.abstract_boundary_operator import ElementaryAbstractIntegralOperator
-    from bempp.api.assembly.abstract_boundary_operator import ElementaryAbstractLocalOperator
+    from bempp.api.operators.boundary._common import get_wave_operator_with_space_preprocessing
+    from bempp.api.space import rewrite_operator_spaces
 
-    if parameters is None:
-        parameters = bempp.api.global_parameters
+    try:
+        hdiv_dual_to_range = dual_to_range._hdiv_space
+    except:
+        raise ValueError("The dual space must be a valid Nedelec curl-conforming space.")
 
-    if not use_slp:
-        return ElementaryBoundaryOperator( \
-                ElementaryAbstractIntegralOperator(
-            electric_field_ext(parameters, domain._impl, range_._impl, dual_to_range._impl,
-                               wave_number, "", symmetry)),
-            parameters=parameters, label=label)
-    else:
+    return rewrite_operator_spaces(get_wave_operator_with_space_preprocessing(
+            _electric_field_impl, domain, range_, hdiv_dual_to_range, 
+            wave_number, label, symmetry, parameters, use_projection_spaces, assemble_only_singular_part),
+            domain, range_, dual_to_range)
 
-        space = domain
+def calderon_electric_field(grid, wave_number, parameters=None):
+    """Return a pair (E^2, E) of the squared EFIE operator E^2 and E itself"""
 
-        if not isinstance(use_slp, BoundaryOperator):
+    import bempp.api
 
-            new_space = space.discontinuous_space
-            slp = bempp.api.operators.boundary.helmholtz.single_layer(new_space, new_space, new_space, wave_number,
-                                                                  parameters=parameters)
-        else:
-            slp = use_slp
+    class EfieSquared(bempp.api.assembly.BoundaryOperator):
 
-        test_local_ops = []
-        trial_local_ops = []
+        def __init__(self, grid, wave_number, parameters):
+            from bempp.api.assembly import InverseSparseDiscreteBoundaryOperator
+            from bempp.api.space import project_operator
 
-        from bempp.api.assembly.boundary_operator import CompoundBoundaryOperator
-        from bempp.core.operators.boundary.sparse import vector_value_times_scalar_ext
-        from bempp.core.operators.boundary.sparse import div_times_scalar_ext
+            bc_space = bempp.api.function_space(grid, "BC", 0)
+            rbc_space = bempp.api.function_space(grid, "RBC", 0)
+            rwg_space = bempp.api.function_space(grid, "B-RWG", 0)
+            snc_space = bempp.api.function_space(grid, "B-SNC", 0)
+            rwg_bary_space = bempp.api.function_space(
+                grid.barycentric_grid(), "RWG", 0)
+            snc_bary_space = bempp.api.function_space(grid.barycentric_grid(), "SNC", 0)
+            super(EfieSquared, self).__init__(rwg_space, rwg_space, rbc_space,
+                                              label="EFIE_SQUARED")
 
-        kappa = -1.j * wave_number
+            self._efie_fine = electric_field(rwg_bary_space, rwg_bary_space, snc_bary_space, wave_number,
+                                             parameters=parameters)
+            self._efie = project_operator(
+                self._efie_fine, domain=rwg_space, range_=rwg_space, dual_to_range=snc_space)
+            self._efie2 = project_operator(
+                self._efie_fine, domain=bc_space, range_=rwg_space, dual_to_range=rbc_space)
+            self._ident = bempp.api.operators.boundary.sparse.identity(
+                bc_space, rwg_space, snc_space)
+            self._inv_ident = InverseSparseDiscreteBoundaryOperator(
+                self._ident.weak_form())
 
-        for index in range(3):
-            # Definition of range_ does not matter in next operator
-            test_local_op = LocalBoundaryOperator(ElementaryAbstractLocalOperator(
-                vector_value_times_scalar_ext(slp.dual_to_range._impl, space._impl, space._impl, index)),
-                    label='VECTOR_VALUE')
-            test_local_ops.append(test_local_op)
-            trial_local_ops.append(test_local_op.transpose(space))  # Range parameter arbitrary
+        def _weak_form_impl(self):
 
-        term1 = CompoundBoundaryOperator(test_local_ops, kappa * slp, trial_local_ops, label=label+"_term1")
+            efie_weak = self._efie.weak_form()
+            efie2_weak = self._efie2.weak_form()
 
-        test_local_ops = []
-        trial_local_ops = []
+            return efie2_weak * self._inv_ident * efie_weak
 
-        div_op = LocalBoundaryOperator(ElementaryAbstractLocalOperator(div_times_scalar_ext(slp.dual_to_range._impl, space._impl, space._impl)),
-            label='DIV')
-        div_op_transpose = div_op.transpose(space) # Range space does not matter
-
-        term2 = CompoundBoundaryOperator([div_op], (1. / kappa) * slp,
-                                         [div_op_transpose], label=label+"_term2")
-
-        return term1 + term2
+    op = EfieSquared(grid, wave_number, parameters)
+    return op, op._efie2
 
 
 def magnetic_field(domain, range_, dual_to_range,
                    wave_number,
                    label="MFIE", symmetry='no_symmetry',
-                   parameters=None):
+                   parameters=None,
+                   use_projection_spaces=True,
+                   assemble_only_singular_part=False):
     """Return the Maxwell magnetic field boundary operator.
 
     Parameters
@@ -130,19 +154,51 @@ def magnetic_field(domain, range_, dual_to_range,
         Parameters for the operator. If none given the
         default global parameter object `bempp.api.global_parameters`
         is used.
+    use_projection_spaces : bool
+        Represent operator by projection from higher dimensional space
+        if available. This parameter can speed up fast assembly routines,
+        such as H-Matrices or FMM (default true).
+    assemble_only_singular_part : bool
+        When assembled the operator will only contain components for adjacent or 
+        overlapping test and trial functions (default false).
 
     """
 
-    import bempp
-    from bempp.core.operators.boundary.maxwell import magnetic_field_ext
-    from bempp.api.assembly import ElementaryBoundaryOperator
-    from bempp.api.assembly.abstract_boundary_operator import ElementaryAbstractIntegralOperator
+    from bempp.api.operators.boundary._common import get_wave_operator_with_space_preprocessing
+    from bempp.api.space import rewrite_operator_spaces
 
-    if parameters is None:
-        parameters = bempp.api.global_parameters
+    try:
+        hdiv_dual_to_range = dual_to_range._hdiv_space
+    except:
+        raise ValueError("The dual space must be a valid Nedelec curl-conforming space.")
 
-    return ElementaryBoundaryOperator( \
-            ElementaryAbstractIntegralOperator(
-        magnetic_field_ext(parameters, domain._impl, range_._impl, dual_to_range._impl,
-                           wave_number, "", symmetry)),
-        parameters=parameters, label=label)
+    return rewrite_operator_spaces(get_wave_operator_with_space_preprocessing(
+            _magnetic_field_impl, domain, range_, hdiv_dual_to_range, 
+            wave_number, label, symmetry, parameters, use_projection_spaces, assemble_only_singular_part),
+            domain, range_, dual_to_range)
+
+def multitrace_operator(grid, wave_number, parameters=None):
+    """Assemble the multitrace operator for Maxwell."""
+
+    from bempp.api.assembly import BlockedOperator
+    from bempp.api.space import project_operator
+    import bempp.api
+
+    blocked_operator = BlockedOperator(2, 2)
+
+    rwg_space_fine = bempp.api.function_space(grid.barycentric_grid(), "RWG", 0)
+    rwg_space = bempp.api.function_space(grid, "B-RWG", 0)
+    bc_space = bempp.api.function_space(grid, "BC", 0)
+    rbc_space = bempp.api.function_space(grid, "RBC", 0)
+    snc_space = bempp.api.function_space(grid, "B-SNC", 0)
+    snc_space_fine = bempp.api.function_space(grid.barycentric_grid(), "SNC", 0)
+
+    efie_fine = electric_field(rwg_space_fine, rwg_space_fine, snc_space_fine, wave_number, parameters=parameters)
+    mfie_fine = magnetic_field(rwg_space_fine, rwg_space_fine, snc_space_fine, wave_number, parameters=parameters)
+
+    blocked_operator[0, 0] = project_operator(mfie_fine, rwg_space, rwg_space, rbc_space)
+    blocked_operator[0, 1] = project_operator(efie_fine, bc_space, rwg_space, rbc_space)
+    blocked_operator[1, 0] = -1 * project_operator(efie_fine, rwg_space, bc_space, snc_space)
+    blocked_operator[1, 1] = project_operator(mfie_fine, bc_space, bc_space, snc_space)
+
+    return blocked_operator

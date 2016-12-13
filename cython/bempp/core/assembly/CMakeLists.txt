@@ -3,6 +3,7 @@ set(headers assembler.pxd
             discrete_boundary_operator.pxd
             discrete_operator_conversion.hpp
             function_projector.hpp
+            assembly_from_functors.hpp
             __init__.pxd
             )
 
@@ -12,8 +13,8 @@ copy_files_on_change(${headers}
     TARGETNAME bempp.core.assembly-copied
 )
 
-install_python(FILES ${headers}
-    DESTINATION bempp/include/bempp/core/assembly)
+#install_python(FILES ${headers}
+#    DESTINATION bempp/include/bempp/core/assembly)
 add_dependencies(cython-headers bempp.core.assembly-copied)
 
 add_python_module(bempp.core.assembly __init__.py

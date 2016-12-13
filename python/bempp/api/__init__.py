@@ -1,7 +1,7 @@
 """ Boundary Element Method package BEM++ """
 from __future__ import print_function
 
-    
+
 # import the version string
 from bempp import config as _config
 __version__ = _config.version
@@ -27,11 +27,11 @@ try:
     import dolfin as _
 except:
     HAVE_DOLFIN = False
-    LOGGER.info("Dolfin could not be imported. FEM/BEM coupling with FEniCS not available.")
+    LOGGER.info(
+        "Dolfin could not be imported. FEM/BEM coupling with FEniCS not available.")
 else:
     HAVE_DOLFIN = True
     LOGGER.info("Found Dolfin. FEM/BEM coupling with FEniCS enabled.")
-
 
 
 # Check if config directory exists. If not create it.
@@ -43,16 +43,16 @@ def _check_create_init_dir():
     import tempfile
 
     home = expanduser("~")
-    config_path = join(home,".bempp")
+    config_path = join(home, ".bempp")
 
     try:
         if not isdir(config_path):
             mkdir(config_path)
-    except OSError: # Read only file system try a tmp dir
+    except OSError:  # Read only file system try a tmp dir
         import warnings
         warnings.warn("Could not create BEM++ config dir."
-            "Falling back to a temorary dir."
-            "Your config will not be stored")
+                      "Falling back to a temorary dir."
+                      "Your config will not be stored")
         config_path = tempfile.mkdtemp()
 
     tmp_path = tempfile.mkdtemp()
@@ -63,6 +63,7 @@ def _check_create_init_dir():
 CONFIG_PATH, TMP_PATH = _check_create_init_dir()
 
 # Get the path to Gmsh
+
 
 def _gmsh_path():
     """Find Gmsh."""
@@ -92,15 +93,18 @@ from bempp.api.space import function_space
 from bempp.api.space import project_operator
 from bempp.api.assembly import GridFunction
 from bempp.api.assembly import InverseSparseDiscreteBoundaryOperator
+from bempp.api.assembly import InverseLocalBoundaryOperator
 from bempp.api.assembly import ZeroBoundaryOperator
 from bempp.api.assembly import RankOneBoundaryOperator
 from bempp.api.assembly import as_matrix
 from bempp.api.assembly import assemble_dense_block
 from bempp.api.assembly import BlockedOperator
 from bempp.api.assembly import BlockedDiscreteOperator
+from bempp.api.assembly import functors
 from bempp.api import shapes
 from bempp.api.file_interfaces import import_grid
 from bempp.api.file_interfaces import export
+from bempp.api.file_interfaces import three_planes_view
 from bempp.api import operators
 from bempp.api import linalg
 from bempp.api import hmat
@@ -110,8 +114,11 @@ from bempp.api.utils.logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
 from bempp.api.utils.logging import enable_console_logging
 from bempp.api.utils.logging import enable_file_logging
 from bempp.api.utils.logging import set_logging_level
+from bempp.api.utils.logging import timeit
+from bempp.api.utils.logging import Timer
 
-ALL = -1 # Useful global identifier
+ALL = -1  # Useful global identifier
+
 
 def test():
     """ Runs BEM++ python unit tests """
@@ -122,4 +129,3 @@ def test():
     test_runner = unittest.TextTestRunner(verbosity=2)
     result = test_runner.run(suite)
     return result.wasSuccessful()
-

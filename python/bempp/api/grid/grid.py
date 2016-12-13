@@ -4,6 +4,7 @@ from .entity import Entity as _Entity
 from .grid_view import GridView as _GridView
 from .id_set import IdSet as _IdSet
 
+
 class Grid(object):
     """The basic grid class in BEM++.
 
@@ -21,14 +22,13 @@ class Grid(object):
     --------
     :mod:`bempp.api.shapes`, :func:`bempp.api.grid.import_grid`,
     :class:`bempp.api.grid.GridFactory`
-    
+
     """
 
     def __init__(self, impl):
         self._impl = impl
-
-    def __eq__(self, other):
-        return self._impl == other._impl
+        self._barycentric_grid = None
+        self._view = None
 
     def plot(self):
         """Plot the grid with Gmsh."""
@@ -69,7 +69,9 @@ class Grid(object):
 
     def barycentric_grid(self):
         """Return a barycentrically refine grid."""
-        return Grid(self._impl.barycentric_grid())
+        if self._barycentric_grid is None:
+            self._barycentric_grid = Grid(self._impl.barycentric_grid())
+        return self._barycentric_grid
 
     def barycentric_descendents_map(self):
         """Return a matrix that provides a map between elements in the original grid and the barycentric refinement.
@@ -120,12 +122,15 @@ class Grid(object):
     @property
     def leaf_view(self):
         """Return a view onto the grid."""
-        return _GridView(self._impl.leaf_view)
+        if self._view is None:
+            self._view = _GridView(self._impl.leaf_view)
+        return self._view
 
     @property
     def id_set(self):
         """Return an Id set for the grid."""
         return _IdSet(self._impl.id_set)
+
 
 def grid_from_element_data(vertices, elements, domain_indices=[]):
     """Create a grid from a given set of vertices and elements.
@@ -159,11 +164,19 @@ def grid_from_element_data(vertices, elements, domain_indices=[]):
     >>> grid = grid_from_element_data(vertices,elements)
 
     """
-
+    from bempp.api import LOGGER
     from bempp.core.grid.grid import grid_from_element_data as grid_fun
-    return Grid(grid_fun(vertices, elements, domain_indices))
-        
-def structured_grid(lower_left, upper_right, subdivisions):
+
+    grid = Grid(grid_fun(vertices, elements, domain_indices))
+    LOGGER.info("Created grid with {0} elements, {1} nodes and {2} edges.".format(grid.leaf_view.entity_count(0),
+                                                                                  grid.leaf_view.entity_count(
+                                                                                      2),
+                                                                                  grid.leaf_view.entity_count(1)))
+
+    return grid
+
+
+def structured_grid(lower_left, upper_right, subdivisions, axis="xy", offset=0):
     """Create a two dimensional grid by defining the lower left and
     upper right point.
 
@@ -176,6 +189,13 @@ def structured_grid(lower_left, upper_right, subdivisions):
     subdivisions : tuple
         A tuple (N,M) specifiying the number of subdivisions in
         each dimension.
+    axis : string
+        Possible choices are "xy", "xz", "yz". Denotes the
+        axes along which the structured grid is generated.
+        Default is "xy".
+    offset : double
+        Defines an offset value that shifts the structured grid
+        in the remaining coordinate direction.
 
     Returns
     -------
@@ -189,11 +209,25 @@ def structured_grid(lower_left, upper_right, subdivisions):
     >>> grid = structured_grid((0,0),(1,1),(100,100))
 
     """
-
     from bempp.core.grid.grid import structured_grid as grid_fun
-    return Grid(grid_fun(lower_left, upper_right, subdivisions))
+    import numpy as np
 
+    # Get a grid along the xy axis
+    grid = Grid(grid_fun(lower_left, upper_right, subdivisions))
+    from bempp.api import LOGGER
 
+    vertices = grid.leaf_view.vertices
+    elements = grid.leaf_view.elements
 
-
-
+    if axis == "xy":
+        # Nothing to be done
+        offset_vector = np.array([[0, 0, offset]]).T
+        return grid_from_element_data(vertices + offset_vector, elements)
+    elif axis == "xz":
+        offset_vector = np.array([[0, offset, 0]]).T
+        return grid_from_element_data(vertices[[0, 2, 1], :] + offset_vector, elements)
+    elif axis == "yz":
+        offset_vector = np.array([[offset, 0, 0]]).T
+        return grid_from_element_data(vertices[[2, 0, 1], :] + offset_vector, elements)
+    else:
+        raise ValueError("axis parameter must be 'xy', 'xz', or 'yz'.")

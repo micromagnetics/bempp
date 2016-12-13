@@ -13,10 +13,8 @@ class IndexSet(object):
 
     def sub_entity_index(self, element, i, codim):
         """Return the subentity index of an element.
-
         This method returns the index of a given subentity
         of an element.
-
         Parameters
         ----------
         element : bempp.api.grid.entity
@@ -25,20 +23,18 @@ class IndexSet(object):
             Number of the subentity.
         codim : int
             Codimension of the subentity.
-
         Returns
         -------
         id : int
             Index o the subentity.
-
         Examples
         --------
         The following code returns the index of the first vertex
         of a given element.
-
         >>> id_set.sub_entity_id(element, 0, 2)
-
         """
         if element.codimension != 0:
             return ValueError("`Element` must be an entity of codimension0.")
         return self._impl.sub_entity_index(element._impl, i, codim)
+
+

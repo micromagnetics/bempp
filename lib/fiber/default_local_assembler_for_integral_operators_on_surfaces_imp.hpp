@@ -303,9 +303,8 @@ void DefaultLocalAssemblerForIntegralOperatorsOnSurfaces<
         quadVariants(testIndex, trialIndex) = CACHED;
         result(testIndex, trialIndex) = *cachedLocalWeakForm;
       } else {
-        const Integrator *integrator =
-            &selectIntegrator(activeTestElementIndex, activeTrialElementIndex,
-                              nominalDistance);
+        const Integrator *integrator = &selectIntegrator(
+            activeTestElementIndex, activeTrialElementIndex, nominalDistance);
         quadVariants(testIndex, trialIndex) =
             QuadVariant(integrator, (*m_testShapesets)[activeTestElementIndex],
                         (*m_trialShapesets)[activeTrialElementIndex]);
@@ -359,6 +358,48 @@ void DefaultLocalAssemblerForIntegralOperatorsOnSurfaces<
     //         if (quadVariants(testIndex, trialIndex) == activeQuadVariant)
     //             result(testIndex, trialIndex) = localResult.slice(i++);
   }
+}
+
+template <typename BasisFunctionType, typename KernelType, typename ResultType,
+          typename GeometryFactory>
+void DefaultLocalAssemblerForIntegralOperatorsOnSurfaces<
+    BasisFunctionType, KernelType, ResultType,
+    GeometryFactory>::evaluateLocalWeakForms(int testElementIndex,
+                                             int trialElementIndex,
+                                             Matrix<ResultType> &result,
+                                             CoordinateType nominalDistance) {
+
+  std::vector<int> testElementVector{testElementIndex};
+  std::vector<int> trialElementVector{trialElementIndex};
+  Fiber::_2dArray<Matrix<ResultType>> resultArray;
+
+  evaluateLocalWeakForms(testElementVector, trialElementVector, resultArray,
+                         nominalDistance);
+  result = resultArray(0, 0);
+}
+
+template <typename BasisFunctionType, typename KernelType, typename ResultType,
+          typename GeometryFactory>
+void DefaultLocalAssemblerForIntegralOperatorsOnSurfaces<
+    BasisFunctionType, KernelType, ResultType, GeometryFactory>::
+    evaluateLocalWeakForms(const std::vector<int> &testElementIndices,
+                           const std::vector<int> &trialElementIndices,
+                           std::vector<Matrix<ResultType>> &result,
+                           CoordinateType nominalDistance) {
+
+  if (testElementIndices.size() != trialElementIndices.size())
+    throw std::runtime_error(
+        "evaluateLocalWeakForms(): "
+        "testElementIndices and trialElementIndices vectors must have the "
+        "same size.");
+
+  std::size_t numberOfIndices = testElementIndices.size();
+  result.resize(numberOfIndices);
+
+  tbb::parallel_for(std::size_t(0), numberOfIndices, [&](size_t i) {
+    evaluateLocalWeakForms(testElementIndices[i], trialElementIndices[i],
+                           result[i], nominalDistance);
+  });
 }
 
 template <typename BasisFunctionType, typename KernelType, typename ResultType,

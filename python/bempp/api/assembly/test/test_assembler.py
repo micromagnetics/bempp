@@ -2,17 +2,20 @@ from unittest import TestCase
 
 
 class TestAssembler(TestCase):
+
     def setUp(self):
-        import bempp
+        import bempp.api
 
         grid = bempp.api.shapes.regular_sphere(3)
         space = bempp.api.function_space(grid, "P", 1)
         pc_space = bempp.api.function_space(grid, "DP", 0)
-        rt_space = bempp.api.function_space(grid, "RT", 0)
 
-        self._real_operator = bempp.api.operators.boundary.laplace.single_layer(space, space, space)
-        self._real_operator_2 = bempp.api.operators.boundary.laplace.single_layer(space, space, pc_space)
-        self._complex_operator = bempp.api.operators.boundary.maxwell.electric_field(rt_space, rt_space, rt_space, 1)
+        self._real_operator = bempp.api.operators.boundary.laplace.single_layer(
+            space, space, space, use_projection_spaces=False)
+        self._real_operator_2 = bempp.api.operators.boundary.laplace.single_layer(
+            space, space, pc_space, use_projection_spaces=False)
+        self._complex_operator = bempp.api.operators.boundary.helmholtz.single_layer(
+            space, space, space, 1, use_projection_spaces=False)
 
         self._rows = (5, 10)
         self._cols = (73, 100)
@@ -34,10 +37,11 @@ class TestAssembler(TestCase):
         actual = as_matrix(assemble_dense_block(self._real_operator, bempp.api.ALL, bempp.api.ALL,
                                                 operator.domain, operator.dual_to_range))
 
+
         expected = as_matrix(operator.weak_form())
 
-        self.assertEqual(258,actual.shape[0])
-        self.assertEqual(258,actual.shape[1])
+        self.assertEqual(258, actual.shape[0])
+        self.assertEqual(258, actual.shape[1])
         self.assertAlmostEqual(np.linalg.norm(actual - expected), 0)
 
     def test_assemble_complete_dense_real_operator_non_square(self):
@@ -71,7 +75,8 @@ class TestAssembler(TestCase):
         actual = as_matrix(assemble_dense_block(self._real_operator, self._rows, self._cols,
                                                 operator.domain, operator.dual_to_range))
 
-        expected = as_matrix(operator.weak_form())[self._rows[0]:self._rows[1], self._cols[0]:self._cols[1]]
+        expected = as_matrix(operator.weak_form())[self._rows[
+            0]:self._rows[1], self._cols[0]:self._cols[1]]
 
         self.assertAlmostEqual(np.linalg.norm(actual - expected), 0)
 
@@ -83,7 +88,6 @@ class TestAssembler(TestCase):
         bempp.api.global_parameters.assembly.boundary_operator_assembly_type = 'dense'
 
         operator = self._complex_operator
-
         actual = as_matrix(assemble_dense_block(self._complex_operator, bempp.api.ALL, bempp.api.ALL,
                                                 operator.domain, operator.dual_to_range))
 
@@ -103,9 +107,93 @@ class TestAssembler(TestCase):
         actual = as_matrix(assemble_dense_block(self._complex_operator, self._rows, self._cols,
                                                 operator.domain, operator.dual_to_range))
 
-        expected = as_matrix(operator.weak_form())[self._rows[0]:self._rows[1], self._cols[0]:self._cols[1]]
+        expected = as_matrix(operator.weak_form())[self._rows[
+            0]:self._rows[1], self._cols[0]:self._cols[1]]
 
         self.assertAlmostEqual(np.linalg.norm(actual - expected), 0)
+
+    def test_singular_assembly_of_laplace_single_layer_operator(self):
+
+        import bempp.api
+        import numpy as np
+
+        grid = bempp.api.shapes.cube(h=0.1)
+        space = bempp.api.function_space(grid, "P", 1)
+
+        parameters = bempp.api.common.global_parameters()
+        parameters.assembly.boundary_operator_assembly_type = 'dense'
+
+        op_sing = bempp.api.operators.boundary.laplace.single_layer(space, space, space,
+                assemble_only_singular_part=True, use_projection_spaces=False)
+
+        op = bempp.api.operators.boundary.laplace.single_layer(space, space, space,
+                use_projection_spaces=False, parameters=parameters)
+
+        mat_sing = op_sing.weak_form().sparse_operator
+
+        mat = bempp.api.as_matrix(op.weak_form())
+
+        indices = mat_sing.nonzero()
+        n_elements = mat_sing.nnz
+
+        actual = np.zeros(n_elements, dtype='float64')
+        expected  = np.zeros(n_elements, dtype='float64')
+
+        for i in range(n_elements):
+
+            m = indices[0][i]
+            n = indices[1][i]
+
+            actual[i] = mat_sing[m, n]
+            expected[i] = mat[m, n]
+
+        from numpy.testing import assert_allclose
+
+        assert_allclose(actual, expected, rtol=1E-13)
+
+
+    def test_singular_assembly_of_maxwell_efie_operator(self):
+
+        import bempp.api
+        import numpy as np
+
+        grid = bempp.api.shapes.cube(h=0.1)
+        rt_space = bempp.api.function_space(grid, "RT", 0)
+        nc_space = bempp.api.function_space(grid, "NC", 0)
+
+        parameters = bempp.api.common.global_parameters()
+        parameters.assembly.boundary_operator_assembly_type = 'dense'
+
+        op_sing = bempp.api.operators.boundary.maxwell.electric_field(rt_space, rt_space, nc_space, 1,
+                assemble_only_singular_part=True, use_projection_spaces=False)
+
+        op = bempp.api.operators.boundary.maxwell.electric_field(rt_space, rt_space, nc_space, 1,
+                use_projection_spaces=False, parameters=parameters)
+
+        mat_sing = op_sing.weak_form().sparse_operator
+
+        mat = bempp.api.as_matrix(op.weak_form())
+
+        indices = mat_sing.nonzero()
+        n_elements = mat_sing.nnz
+
+        actual = np.zeros(n_elements, dtype='complex128')
+        expected  = np.zeros(n_elements, dtype='complex128')
+
+        for i in range(n_elements):
+
+            m = indices[0][i]
+            n = indices[1][i]
+
+            actual[i] = mat_sing[m, n]
+            expected[i] = mat[m, n]
+
+        from numpy.testing import assert_allclose
+
+        self.assertAlmostEqual(np.linalg.norm(actual-expected,np.inf)/np.linalg.norm(expected,np.inf), 0)
+
+
+
 
 if __name__ == "__main__":
     from unittest import main

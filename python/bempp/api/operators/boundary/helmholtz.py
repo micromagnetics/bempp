@@ -1,14 +1,16 @@
 # pylint: disable-msg=too-many-arguments
-from bempp.api.assembly.boundary_operator import BoundaryOperator as _BoundaryOperator
-import numpy as _np
-
 """Definition of the Helmholtz boundary operators."""
+from bempp.api.assembly.boundary_operator import \
+    BoundaryOperator as _BoundaryOperator
+import numpy as _np
 
 
 def single_layer(domain, range_, dual_to_range,
                  wave_number,
                  label="SLP", symmetry='no_symmetry',
-                 parameters=None):
+                 parameters=None,
+                 use_projection_spaces=True,
+                 assemble_only_singular_part=False):
     """Return the Helmholtz single-layer boundary operator.
 
     Parameters
@@ -30,21 +32,28 @@ def single_layer(domain, range_, dual_to_range,
         Parameters for the operator. If none given the
         default global parameter object `bempp.api.global_parameters`
         is used.
+    use_projection_spaces : bool
+        Represent operator by projection from higher dimensional space
+        if available. This parameter can speed up fast assembly routines,
+        such as H-Matrices or FMM (default true).
+    assemble_only_singular_part : bool
+        When assembled the operator will only contain components for adjacent or 
+        overlapping test and trial functions (default false).
 
     """
-
-
     from .modified_helmholtz import single_layer as sl
 
     return sl(domain, range_, dual_to_range,
               wave_number / (1j), label, symmetry,
-              parameters)
+              parameters, use_projection_spaces, assemble_only_singular_part)
 
 
 def double_layer(domain, range_, dual_to_range,
                  wave_number,
                  label="DLP", symmetry='no_symmetry',
-                 parameters=None):
+                 parameters=None,
+                 use_projection_spaces=True,
+                 assemble_only_singular_part=False):
     """Return the Helmholtz double-layer boundary operator.
 
     Parameters
@@ -66,6 +75,13 @@ def double_layer(domain, range_, dual_to_range,
         Parameters for the operator. If none given the
         default global parameter object `bempp.api.global_parameters`
         is used.
+    use_projection_spaces : bool
+        Represent operator by projection from higher dimensional space
+        if available. This parameter can speed up fast assembly routines,
+        such as H-Matrices or FMM (default true).
+    assemble_only_singular_part : bool
+        When assembled the operator will only contain components for adjacent or 
+        overlapping test and trial functions (default false).
 
     """
 
@@ -73,13 +89,17 @@ def double_layer(domain, range_, dual_to_range,
 
     return dl(domain, range_, dual_to_range,
               wave_number / (1j), label, symmetry,
-              parameters)
+              parameters,
+              use_projection_spaces,
+              assemble_only_singular_part)
 
 
 def adjoint_double_layer(domain, range_, dual_to_range,
                          wave_number,
                          label="ADJ_DLP", symmetry='no_symmetry',
-                         parameters=None):
+                         parameters=None,
+                         use_projection_spaces=True,
+                         assemble_only_singular_part=False):
     """Return the Helmholtz adjoint double-layer boundary operator.
 
     Parameters
@@ -101,6 +121,13 @@ def adjoint_double_layer(domain, range_, dual_to_range,
         Parameters for the operator. If none given the
         default global parameter object `bempp.api.global_parameters`
         is used.
+    use_projection_spaces : bool
+        Represent operator by projection from higher dimensional space
+        if available. This parameter can speed up fast assembly routines,
+        such as H-Matrices or FMM (default true).
+    assemble_only_singular_part : bool
+        When assembled the operator will only contain components for adjacent or 
+        overlapping test and trial functions (default false).
 
     """
 
@@ -108,14 +135,18 @@ def adjoint_double_layer(domain, range_, dual_to_range,
 
     return adl(domain, range_, dual_to_range,
                wave_number / (1j), label, symmetry,
-               parameters)
+               parameters,
+               use_projection_spaces=True,
+               assemble_only_singular_part=False)
 
 
 def hypersingular(domain, range_, dual_to_range,
                   wave_number,
                   label="HYP", symmetry='no_symmetry',
                   parameters=None,
-                  use_slp=False):
+                  use_slp=False,
+                  use_projection_spaces=True,
+                  assemble_only_singular_part=False):
     """Return the Helmholtz hypersingular boundary operator.
 
     Parameters
@@ -137,6 +168,10 @@ def hypersingular(domain, range_, dual_to_range,
         Parameters for the operator. If none given the
         default global parameter object `bempp.api.global_parameters`
         is used.
+    use_projection_spaces : bool
+        Represent operator by projection from higher dimensional space
+        if available. This parameter can speed up fast assembly routines,
+        such as H-Matrices or FMM (default true).
     use_slp : True/False or boundary operator object
         The hypersingular operator can be represented as a sparse transformation
         of a single-layer operator. If `use_slp=True` this representation is used.
@@ -147,17 +182,22 @@ def hypersingular(domain, range_, dual_to_range,
         if no care is taken this option can lead to a wrong operator. Also,
         `use_slp=True` or `use_slp=op` is only valid if the `domain` and `dual_to_range`
         spaces are identical.
-
-
+    assemble_only_singular_part : bool
+        When assembled the operator will only contain components for adjacent or 
+        overlapping test and trial functions (default false).
+        Note. This option is only used if `use_slp` is not specified.
     """
 
     from .modified_helmholtz import hypersingular as hyp
 
     return hyp(domain, range_, dual_to_range,
                wave_number / (1j), label, symmetry,
-               use_slp=use_slp, parameters=parameters)
+               use_slp=use_slp, parameters=parameters,
+               use_projection_spaces=use_projection_spaces,
+               assemble_only_singular_part=False)
 
-def multitrace_operator(grid, wave_number, parameters=None, spaces='linear'):
+
+def multitrace_operator(grid, wave_number, parameters=None, spaces='linear', target=None):
     """Return the Helmholtz multitrace operator.
 
     Parameters
@@ -177,21 +217,26 @@ def multitrace_operator(grid, wave_number, parameters=None, spaces='linear'):
         a dual pairing of a linear space for the Dirichlet
         data and piecewise constant space for the Neumann
         data choose 'dual'.
+    target: bempp.api.grid.Grid
+        Specifies a target grid. If it is different from
+        'grid' then the operator maps from 'grid' to
+        'target'.
 
     """
 
     import bempp.api
     return bempp.api.operators.boundary.modified_helmholtz.multitrace_operator(
-            grid, wave_number/(1j), parameters, spaces)
+        grid, wave_number / (1j), parameters, spaces, target=target)
+
 
 def single_layer_and_hypersingular_pair(grid, wave_number, parameters=None, spaces='linear', base_slp=None,
-        return_base_slp=False):
+                                        return_base_slp=False):
     """Return a pair of hypersingular and single layer operator.
 
     This function creates a pair of a single-layer and a hypersingular
     operator, where both operators are instantiated using a common
     base single-layer operator. Hence, only one single-layer operator
-    needs to be discretized to obtain both operators on the given 
+    needs to be discretized to obtain both operators on the given
     grid.
 
     Parameters
@@ -212,11 +257,11 @@ def single_layer_and_hypersingular_pair(grid, wave_number, parameters=None, spac
         data and piecewise constant space for the Neumann
         data choose 'dual'.
     base_slp : None
-        Specify a base single-layer operator to be used. If 
+        Specify a base single-layer operator to be used. If
         set to None, a base single-layer operator will be
         instantiated by the function.
     return_base_slp : bool
-        If True also return the original large space single layer 
+        If True also return the original large space single layer
         operator from which the hypersingular and slp operator
         are derived. Default is False
 
@@ -230,7 +275,8 @@ def single_layer_and_hypersingular_pair(grid, wave_number, parameters=None, spac
     """
     import bempp.api
     return bempp.api.operators.boundary.modified_helmholtz.single_layer_and_hypersingular_pair(
-            grid, wave_number/(1j), parameters, spaces, base_slp, return_base_slp)
+        grid, wave_number / (1j), parameters, spaces, base_slp, return_base_slp)
+
 
 def interior_calderon_projector(grid, wave_number, parameters=None):
     """Return the interior Calderon projector.
@@ -251,6 +297,7 @@ def interior_calderon_projector(grid, wave_number, parameters=None):
     from .sparse import multitrace_identity
 
     return .5 * multitrace_identity(grid, parameters) + multitrace_operator(grid, wave_number, parameters)
+
 
 def exterior_calderon_projector(grid, wave_number, parameters=None):
     """Return the exterior Calderon projector.
@@ -300,6 +347,7 @@ def osrc_dtn(space, wave_number, npade=2, theta=_np.pi / 3,
 
 
 class _OsrcDtn(_BoundaryOperator):
+
     def __init__(self, space, wave_number, npade=2, theta=_np.pi / 3.,
                  parameters=None, label="osrc_dtn"):
         super(_OsrcDtn, self).__init__(space, space, space, label=label)
@@ -321,14 +369,17 @@ class _OsrcDtn(_BoundaryOperator):
         space = self._space
 
         # Get the operators
-        mass = identity(space, space, space, parameters=self._parameters).weak_form()
-        stiff = laplace_beltrami(space, space, space, parameters=self._parameters).weak_form()
+        mass = identity(space, space, space,
+                        parameters=self._parameters).weak_form()
+        stiff = laplace_beltrami(
+            space, space, space, parameters=self._parameters).weak_form()
 
         # Compute damped wavenumber
 
         bbox = self._space.grid.bounding_box
         rad = np.linalg.norm(bbox[1, :] - bbox[0, :]) / 2
-        dk = self._wave_number + 1j * 0.4 * self._wave_number ** (1.0 / 3.0) * rad ** (-2.0 / 3.0)
+        dk = self._wave_number + 1j * 0.4 * \
+            self._wave_number ** (1.0 / 3.0) * rad ** (-2.0 / 3.0)
 
         # Get the Pade coefficients
 
@@ -372,6 +423,7 @@ def osrc_ntd(space, wave_number, npade=2, theta=_np.pi / 3, parameters=None, lab
 
 
 class _OsrcNtd(_BoundaryOperator):
+
     def __init__(self, space, wave_number, npade=2, theta=_np.pi / 3.,
                  parameters=None, label="osrc_ntd"):
         super(_OsrcNtd, self).__init__(space, space, space, label=label)
@@ -393,14 +445,17 @@ class _OsrcNtd(_BoundaryOperator):
         space = self._space
 
         # Get the operators
-        mass = identity(space, space, space, parameters=self._parameters).weak_form()
-        stiff = laplace_beltrami(space, space, space, parameters=self._parameters).weak_form()
+        mass = identity(space, space, space,
+                        parameters=self._parameters).weak_form()
+        stiff = laplace_beltrami(
+            space, space, space, parameters=self._parameters).weak_form()
 
         # Compute damped wavenumber
 
         bbox = self._space.grid.bounding_box
         rad = np.linalg.norm(bbox[1, :] - bbox[0, :]) / 2
-        dk = self._wave_number + 1j * 0.4 * self._wave_number ** (1.0 / 3.0) * rad ** (-2.0 / 3.0)
+        dk = self._wave_number + 1j * 0.4 * \
+            self._wave_number ** (1.0 / 3.0) * rad ** (-2.0 / 3.0)
 
         # Get the Pade coefficients
 
@@ -452,11 +507,13 @@ def _pade_coeffs(n, theta):
     bj = np.zeros(Np)
     for jj in range(1, Np + 1):  # remember Python skips the last index
         # remember that Python starts with zero in an array
-        aj[jj - 1] = 2.0 / (2.0 * Np + 1.0) * np.sin(jj * np.pi / (2.0 * Np + 1.0)) ** 2
+        aj[jj - 1] = 2.0 / (2.0 * Np + 1.0) * np.sin(jj *
+                                                     np.pi / (2.0 * Np + 1.0)) ** 2
         bj[jj - 1] = np.cos(jj * np.pi / (2.0 * Np + 1.0)) ** 2
     # Now define the coefficients for the 'theta' branch cut.
     C0t = np.exp(1j * theta / 2.0) * (
         1.0 + np.sum((aj * (np.exp(-1j * theta) - 1.0)) / (1.0 + bj * (np.exp(-1j * theta) - 1.0))))
-    ajt = np.exp(-1j * theta / 2.0) * aj / ((1 + bj * (np.exp(-1j * theta) - 1)) ** 2)
+    ajt = np.exp(-1j * theta / 2.0) * aj / \
+        ((1 + bj * (np.exp(-1j * theta) - 1)) ** 2)
     bjt = np.exp(-1j * theta) * bj / (1 + bj * (np.exp(-1j * theta) - 1))
     return C0t, ajt, bjt
